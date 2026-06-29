@@ -208,6 +208,7 @@ td.notes-cell{white-space:normal;max-width:260px;color:var(--bright);text-align:
 
 <nav>
   <button class="active" onclick="switchTab('exec',this)">Executive Summary</button>
+  <button onclick="switchTab('critical',this)">Critical Works</button>
   <button onclick="switchTab('field',this)">Field Updates</button>
 </nav>
 
@@ -273,6 +274,28 @@ td.notes-cell{white-space:normal;max-width:260px;color:var(--bright);text-align:
 
   </div>
 
+  <!-- ══ CRITICAL WORKS ══ -->
+  <div id="tab-critical" class="tab-panel">
+    <div class="filter-row">
+      <input type="text" id="critSearch" placeholder="Search WO, header…" oninput="renderCritical()">
+      <select id="critTeam" onchange="renderCritical()"><option value="">All Teams</option></select>
+      <select id="critPct" onchange="renderCritical()">
+        <option value="">Any % Complete</option>
+        <option value="0">Not Started (0%)</option>
+        <option value="partial">In Progress</option>
+        <option value="100">Complete (100%)</option>
+      </select>
+      <select id="critCpct" onchange="renderCritical()">
+        <option value="">CP &amp; CT</option>
+        <option value="1">CP Only (Critical Path)</option>
+        <option value="2">CT Only (Critical Task)</option>
+      </select>
+    </div>
+    <div class="panel">
+      <div class="tbl-wrap"><table id="critTable"></table></div>
+    </div>
+  </div>
+
   <!-- ══ FIELD UPDATES ══ -->
   <div id="tab-field" class="tab-panel">
     <div class="filter-row">
@@ -299,7 +322,7 @@ td.notes-cell{white-space:normal;max-width:260px;color:var(--bright);text-align:
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbwp4KdsvPWv2pON1iIOTjaJhYeLJpLZWBfShz2nBZRPCsCIeVH40o-GAURk9gPg7d-BZw/exec';
 
 // ── STATE ─────────────────────────────────────────────────────
-let _exec = null, _gantt = null, _scurve = null, _field = null;
+let _exec = null, _gantt = null, _scurve = null, _field = null, _critical = null;
 let _scurveChart = null;
 
 // ── TABS ──────────────────────────────────────────────────────
@@ -330,15 +353,16 @@ async function loadAll() {
   document.getElementById('overlay').style.display = 'flex';
   document.getElementById('errBanner').style.display = 'none';
   try {
-    const [meta, exec, gantt, scurve, field] = await Promise.all([
-      gas('meta'), gas('exec'), gas('gantt'), gas('scurve'), gas('fieldupdates')
+    const [meta, exec, gantt, scurve, field, critical] = await Promise.all([
+      gas('meta'), gas('exec'), gas('gantt'), gas('scurve'), gas('fieldupdates'), gas('criticalworks')
     ]);
-    _exec = exec; _gantt = gantt; _scurve = scurve; _field = field;
+    _exec = exec; _gantt = gantt; _scurve = scurve; _field = field; _critical = critical;
     applyMeta(meta);
     renderExec();
     renderGantt();
     initScurve();
     initField();
+    initCritical();
   } catch(e) {
     showErr('Error loading data: ' + e.message);
   } finally {
@@ -613,6 +637,67 @@ function renderScurve() {
       },
     },
   });
+}
+
+// ── CRITICAL WORKS ────────────────────────────────────────────
+function initCritical() {
+  const d = _critical;
+  if (!d || !d.rows) return;
+
+  const sel = document.getElementById('critTeam');
+  sel.innerHTML = '<option value="">All Teams</option>' +
+    (d.teams || []).map(t => `<option value="${t}">${t}</option>`).join('');
+
+  renderCritical();
+}
+
+function renderCritical() {
+  const d = _critical;
+  if (!d || !d.rows) return;
+
+  const search  = (document.getElementById('critSearch').value || '').toLowerCase();
+  const team    = document.getElementById('critTeam').value;
+  const pctFil  = document.getElementById('critPct').value;
+  const cpctFil = document.getElementById('critCpct').value;
+
+  let rows = d.rows.filter(r => {
+    if (team    && r.team !== team)              return false;
+    if (cpctFil && r.cpct !== parseFloat(cpctFil)) return false;
+    if (pctFil === '0'       && r.pctComplete !== 0)                           return false;
+    if (pctFil === '100'     && r.pctComplete !== 100)                         return false;
+    if (pctFil === 'partial' && (r.pctComplete === 0 || r.pctComplete === 100)) return false;
+    if (search) {
+      const hay = [r.workOrder, r.wo, r.team, r.start, r.finish].join(' ').toLowerCase();
+      if (!hay.includes(search)) return false;
+    }
+    return true;
+  });
+
+  const cols = ['CP','WO Number','WO Header','Team','PSD','PFD','%','TS'];
+
+  const cpDot = cpct => {
+    if (cpct === 1) return '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--red);margin-right:5px;vertical-align:middle"></span>CP';
+    if (cpct === 2) return '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--amber);margin-right:5px;vertical-align:middle"></span>CT';
+    return '—';
+  };
+
+  const pctCls = p => p >= 100 ? 'tag-green' : p > 0 ? 'tag-amber' : 'tag-red';
+
+  const tHead = cols.map(h => `<th style="text-align:left">${h}</th>`).join('');
+  const tBody = rows.map(r => `<tr>
+    <td>${cpDot(r.cpct)}</td>
+    <td style="font-family:var(--font-d)">${r.workOrder || '—'}</td>
+    <td>${r.wo || '—'}</td>
+    <td>${r.team || '—'}</td>
+    <td style="font-family:var(--font-d)">${r.start || '—'}</td>
+    <td style="font-family:var(--font-d)">${r.finish || '—'}</td>
+    <td><span class="tag ${pctCls(r.pctComplete)}">${r.pctComplete}%</span></td>
+    <td style="font-family:var(--font-d);text-align:right">${r.totalSlack}</td>
+  </tr>`).join('');
+
+  document.getElementById('critTable').innerHTML =
+    `<thead><tr>${tHead}</tr></thead>` +
+    `<tbody>${tBody || `<tr><td colspan="${cols.length}" style="text-align:center;color:var(--muted);padding:20px">No critical works found</td></tr>`}</tbody>`;
 }
 
 // ── FIELD UPDATES ─────────────────────────────────────────────
