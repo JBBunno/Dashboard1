@@ -677,7 +677,6 @@ function renderCritical() {
     { label: 'CP',        align: 'center' },
     { label: 'WO Number', align: 'center' },
     { label: 'WO Header', align: 'left'   },
-    { label: 'Team',      align: 'left'   },
     { label: 'PSD',       align: 'left'   },
     { label: 'PFD',       align: 'left'   },
     { label: '%',         align: 'center' },
@@ -697,7 +696,6 @@ function renderCritical() {
     <td style="text-align:center">${cpDot(r.cpct)}</td>
     <td style="text-align:center;font-family:var(--font-d)">${r.workOrder || '—'}</td>
     <td style="text-align:left">${r.wo || '—'}</td>
-    <td style="text-align:left">${r.team || '—'}</td>
     <td style="text-align:left;font-family:var(--font-d)">${r.start || '—'}</td>
     <td style="text-align:left;font-family:var(--font-d)">${r.finish || '—'}</td>
     <td style="text-align:center"><span class="tag ${pctCls(r.pctComplete)}">${r.pctComplete}%</span></td>
@@ -706,7 +704,7 @@ function renderCritical() {
 
   document.getElementById('critTable').innerHTML =
     `<thead><tr>${tHead}</tr></thead>` +
-    `<tbody>${tBody || `<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:20px">No critical works found</td></tr>`}</tbody>`;
+    `<tbody>${tBody || `<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:20px">No critical works found</td></tr>`}</tbody>`;
 }
 
 // ── FIELD UPDATES ─────────────────────────────────────────────
