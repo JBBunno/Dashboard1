@@ -673,7 +673,16 @@ function renderCritical() {
     return true;
   });
 
-  const cols = ['CP','WO Number','WO Header','Team','PSD','PFD','%','TS'];
+  const cols = [
+    { label: 'CP',        align: 'center' },
+    { label: 'WO Number', align: 'center' },
+    { label: 'WO Header', align: 'left'   },
+    { label: 'Team',      align: 'left'   },
+    { label: 'PSD',       align: 'left'   },
+    { label: 'PFD',       align: 'left'   },
+    { label: '%',         align: 'center' },
+    { label: 'TS',        align: 'center' },
+  ];
 
   const cpDot = cpct => {
     if (cpct === 1) return '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--red);margin-right:5px;vertical-align:middle"></span>CP';
@@ -683,21 +692,21 @@ function renderCritical() {
 
   const pctCls = p => p >= 100 ? 'tag-green' : p > 0 ? 'tag-amber' : 'tag-red';
 
-  const tHead = cols.map(h => `<th style="text-align:left">${h}</th>`).join('');
+  const tHead = cols.map(c => `<th style="text-align:${c.align}">${c.label}</th>`).join('');
   const tBody = rows.map(r => `<tr>
-    <td>${cpDot(r.cpct)}</td>
-    <td style="font-family:var(--font-d)">${r.workOrder || '—'}</td>
-    <td>${r.wo || '—'}</td>
-    <td>${r.team || '—'}</td>
-    <td style="font-family:var(--font-d)">${r.start || '—'}</td>
-    <td style="font-family:var(--font-d)">${r.finish || '—'}</td>
-    <td><span class="tag ${pctCls(r.pctComplete)}">${r.pctComplete}%</span></td>
-    <td style="font-family:var(--font-d);text-align:right">${r.totalSlack}</td>
+    <td style="text-align:center">${cpDot(r.cpct)}</td>
+    <td style="text-align:center;font-family:var(--font-d)">${r.workOrder || '—'}</td>
+    <td style="text-align:left">${r.wo || '—'}</td>
+    <td style="text-align:left">${r.team || '—'}</td>
+    <td style="text-align:left;font-family:var(--font-d)">${r.start || '—'}</td>
+    <td style="text-align:left;font-family:var(--font-d)">${r.finish || '—'}</td>
+    <td style="text-align:center"><span class="tag ${pctCls(r.pctComplete)}">${r.pctComplete}%</span></td>
+    <td style="text-align:center;font-family:var(--font-d)">${r.totalSlack}</td>
   </tr>`).join('');
 
   document.getElementById('critTable').innerHTML =
     `<thead><tr>${tHead}</tr></thead>` +
-    `<tbody>${tBody || `<tr><td colspan="${cols.length}" style="text-align:center;color:var(--muted);padding:20px">No critical works found</td></tr>`}</tbody>`;
+    `<tbody>${tBody || `<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:20px">No critical works found</td></tr>`}</tbody>`;
 }
 
 // ── FIELD UPDATES ─────────────────────────────────────────────
