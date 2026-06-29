@@ -225,8 +225,14 @@ td.notes-cell{white-space:normal;max-width:260px;color:var(--bright);text-align:
     </div>
 
     <!-- Maintenance Window -->
-    <div class="maint-band mb12" id="maintBand">
-      <div class="maint-title">Maintenance Window</div>
+    <div class="maint-band mb12">
+      <div class="maint-title">
+        <select id="maintAreaSelect" onchange="renderMaintWindow()" style="
+          background:transparent;border:none;color:var(--amber);
+          font-size:9px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;
+          cursor:pointer;outline:none;font-family:var(--font-u);width:140px;
+        "></select>
+      </div>
       <div class="maint-fields" id="maintFields"></div>
     </div>
 
@@ -408,7 +414,7 @@ function renderExec() {
   if (!d || !d.kpis) return;
   const { kpis, areas } = d;
 
-  // KPI band
+  // KPI band — always top-level rollup
   const pc  = kpis.pctComplete || 0;
   const ov  = kpis.forecastOverrun || 0;
   const rw  = kpis.remainingWorkHours || 0;
@@ -434,38 +440,16 @@ function renderExec() {
       </div>
     </div>`;
 
-  // Maintenance Window
-  const mw = kpis.maintWindow || {};
-  const mwOv = mw.overrun || 0;
-  document.getElementById('maintFields').innerHTML = `
-    <div class="maint-field">
-      <div class="maint-field-label">Start</div>
-      <div class="maint-field-value">${mw.start || '—'}</div>
-    </div>
-    <div class="maint-field">
-      <div class="maint-field-label">Finish</div>
-      <div class="maint-field-value">${mw.finish || '—'}</div>
-    </div>
-    <div class="maint-field">
-      <div class="maint-field-label">Work Hours</div>
-      <div class="maint-field-value">${fmtN0(mw.workHours)} Hrs</div>
-    </div>
-    <div class="maint-field">
-      <div class="maint-field-label">Completed</div>
-      <div class="maint-field-value">${fmtN0(mw.completed)} Hrs</div>
-    </div>
-    <div class="maint-field">
-      <div class="maint-field-label">Overrun</div>
-      <div class="maint-field-value ${mwOv > 0 ? 'amber' : mwOv < 0 ? 'green' : ''}">
-        ${mwOv > 0 ? '+' : ''}${fmtN1(mwOv)} Hrs
-      </div>
-    </div>
-    <div class="maint-field">
-      <div class="maint-field-label">% Complete</div>
-      <div class="maint-field-value ${mw.pctComplete >= 90 ? 'green' : mw.pctComplete >= 50 ? 'amber' : 'red'}">
-        ${mw.pctComplete || 0}%
-      </div>
-    </div>`;
+  // Populate area selector with all ES row names
+  const sel = document.getElementById('maintAreaSelect');
+  sel.innerHTML = (areas || []).map(a =>
+    `<option value="${a.name}">${a.name}</option>`
+  ).join('');
+  // Default to Maintenance Window row if present, else first
+  const mwOpt = (areas || []).find(a => /maintenance window/i.test(a.name));
+  if (mwOpt) sel.value = mwOpt.name;
+
+  renderMaintWindow();
 
   // Area table
   const cols = ['Area','% Comp','Duration','Completed Work','Total Work','Remaining Work','Start','Forecast Finish','Hrs to Critical','Finish Var'];
@@ -490,6 +474,46 @@ function renderExec() {
   document.getElementById('areaTable').innerHTML =
     `<thead><tr>${cols.map(h => `<th>${h}</th>`).join('')}</tr></thead>
      <tbody>${tbody || '<tr><td colspan="10" style="text-align:center;color:var(--muted);padding:20px">No data</td></tr>'}</tbody>`;
+}
+
+function renderMaintWindow() {
+  const d = _exec;
+  if (!d || !d.areas) return;
+
+  const selName = document.getElementById('maintAreaSelect').value;
+  const area = d.areas.find(a => a.name === selName) || d.areas[0];
+  if (!area) return;
+
+  const ov = area.finishVariance || 0;
+  document.getElementById('maintFields').innerHTML = `
+    <div class="maint-field">
+      <div class="maint-field-label">Start</div>
+      <div class="maint-field-value">${area.start || '—'}</div>
+    </div>
+    <div class="maint-field">
+      <div class="maint-field-label">Finish</div>
+      <div class="maint-field-value">${area.forecastFinish || '—'}</div>
+    </div>
+    <div class="maint-field">
+      <div class="maint-field-label">Work Hours</div>
+      <div class="maint-field-value">${fmtN0(area.totalWork)} Hrs</div>
+    </div>
+    <div class="maint-field">
+      <div class="maint-field-label">Completed</div>
+      <div class="maint-field-value">${fmtN0(area.completedWork)} Hrs</div>
+    </div>
+    <div class="maint-field">
+      <div class="maint-field-label">Overrun</div>
+      <div class="maint-field-value ${ov > 0 ? 'amber' : ov < 0 ? 'green' : ''}">
+        ${ov > 0 ? '+' : ''}${fmtN1(ov)} Hrs
+      </div>
+    </div>
+    <div class="maint-field">
+      <div class="maint-field-label">% Complete</div>
+      <div class="maint-field-value ${area.pctComplete >= 90 ? 'green' : area.pctComplete >= 50 ? 'amber' : 'red'}">
+        ${area.pctComplete || 0}%
+      </div>
+    </div>`;
 }
 
 // ── GANTT ─────────────────────────────────────────────────────
