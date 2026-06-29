@@ -266,7 +266,7 @@ td.notes-cell{white-space:normal;max-width:260px;color:var(--bright);text-align:
           <div class="leg-line" style="background:rgba(180,180,180,.4);height:10px;border-radius:2px"></div><span>Spent (hrs)</span>
         </div>
       </div>
-      <canvas id="scurveCanvas" height="340"></canvas>
+      <canvas id="scurveCanvas" height="200"></canvas>
     </div>
 
   </div>
@@ -617,7 +617,7 @@ function initField() {
   const d = _field;
   if (!d || !d.rows) return;
 
-  // Build team filter from Team column (index 0)
+  // Team is always first column (index 0)
   const teams = [...new Set(d.rows.map(r => r[0]).filter(Boolean))].sort();
   const sel = document.getElementById('fieldTeam');
   sel.innerHTML = '<option value="">All Teams</option>' +
@@ -634,42 +634,47 @@ function renderField() {
   const team   = document.getElementById('fieldTeam').value;
   const status = document.getElementById('fieldStatus').value;
 
-  const headers = d.headers;
-  // Find key column indices from display headers
-  const iTeam   = headers.findIndex(h => /^team$/i.test(h));
-  const iStatus = headers.findIndex(h => /upload.?status|wo.?status/i.test(h));
-  const iNotes  = headers.findIndex(h => /field.?notes?|notes/i.test(h));
+  const headers = d.headers; // colloquial labels from GAS
+
+  // Known column positions by label
+  const iTeam   = headers.indexOf('Team');
+  const iStatus = headers.indexOf('Upload Status');
+  const iNotes  = headers.indexOf('Field Notes');
+  const iProj   = headers.indexOf('Project');
+  const iApp    = headers.indexOf('App');
 
   let rows = d.rows.filter(r => {
-    if (team   && iTeam   >= 0 && r[iTeam]   !== team)   return false;
-    if (status && iStatus >= 0 && r[iStatus]  !== status) return false;
-    if (search) {
-      if (!r.join(' ').toLowerCase().includes(search)) return false;
-    }
+    if (team   && r[iTeam]   !== team)   return false;
+    if (status && iStatus >= 0 && r[iStatus] !== status) return false;
+    if (search && !r.join(' ').toLowerCase().includes(search)) return false;
     return true;
   });
 
-  // Build thead from display headers (skip empty columns)
-  const activeIdx = headers.map((h, i) => h ? i : -1).filter(i => i >= 0);
-  const tHead = activeIdx.map(i => `<th style="text-align:left">${headers[i]}</th>`).join('');
+  const tHead = headers.map(h => `<th style="text-align:left">${h}</th>`).join('');
 
   const tBody = rows.slice(0, 500).map(r => {
-    return '<tr>' + activeIdx.map(ci => {
-      const val = r[ci] || '';
+    return '<tr>' + r.map((val, ci) => {
       const isStatus = ci === iStatus;
       const isNotes  = ci === iNotes;
+      const isPct    = ci === iProj || ci === iApp;
+
       if (isStatus) {
         const cls = val === 'Completed' ? 'badge-done' : 'badge-pend';
         return `<td><span class="badge ${cls}">${val || '—'}</span></td>`;
       }
-      if (isNotes && val) return `<td class="notes-cell">${val}</td>`;
+      if (isNotes && val) {
+        return `<td class="notes-cell">${val}</td>`;
+      }
+      if (isPct) {
+        return `<td style="text-align:left;font-family:var(--font-d)">${val || '—'}</td>`;
+      }
       return `<td style="text-align:left">${val || '—'}</td>`;
     }).join('') + '</tr>';
   }).join('');
 
   document.getElementById('fieldTable').innerHTML =
     `<thead><tr>${tHead}</tr></thead>` +
-    `<tbody>${tBody || `<tr><td colspan="${activeIdx.length}" style="text-align:center;color:var(--muted);padding:20px">No results</td></tr>`}</tbody>`;
+    `<tbody>${tBody || `<tr><td colspan="${headers.length}" style="text-align:center;color:var(--muted);padding:20px">No results</td></tr>`}</tbody>`;
 }
 
 // ── BOOT ──────────────────────────────────────────────────────
