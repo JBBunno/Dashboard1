@@ -266,7 +266,9 @@ td.notes-cell{white-space:normal;max-width:260px;color:var(--bright);text-align:
           <div class="leg-line" style="background:rgba(180,180,180,.4);height:10px;border-radius:2px"></div><span>Spent (hrs)</span>
         </div>
       </div>
-      <canvas id="scurveCanvas" height="200"></canvas>
+      <div style="position:relative;height:180px">
+        <canvas id="scurveCanvas"></canvas>
+      </div>
     </div>
 
   </div>
@@ -568,6 +570,7 @@ function renderScurve() {
     },
     options: {
       responsive: true,
+      maintainAspectRatio: false,
       interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { display: false },
