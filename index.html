@@ -209,6 +209,7 @@ td.notes-cell{white-space:normal;max-width:260px;color:var(--bright);text-align:
 <nav>
   <button class="active" onclick="switchTab('exec',this)">Executive Summary</button>
   <button onclick="switchTab('critical',this)">Critical Works</button>
+  <button onclick="switchTab('vendor',this)">Vendor Updates</button>
   <button onclick="switchTab('field',this)">Field Updates</button>
 </nav>
 
@@ -302,6 +303,34 @@ td.notes-cell{white-space:normal;max-width:260px;color:var(--bright);text-align:
     </div>
   </div>
 
+  <!-- ══ VENDOR UPDATES ══ -->
+  <div id="tab-vendor" class="tab-panel">
+    <div class="panel mb12">
+      <div class="panel-title">Field Updates Target &amp; Actual — by Vendor</div>
+      <div class="chart-legend" style="margin-bottom:12px">
+        <div class="chart-legend-item">
+          <div class="leg-line" style="background:#4a9e5c;height:10px;border-radius:2px"></div>
+          <span>% Updated</span>
+        </div>
+        <div class="chart-legend-item">
+          <div class="leg-line" style="background:#aaa;height:10px;border-radius:2px"></div>
+          <span>Target %</span>
+        </div>
+        <div class="chart-legend-item">
+          <div class="leg-line" style="background:#5b9bd5;height:10px;border-radius:2px"></div>
+          <span>Completion Ratio</span>
+        </div>
+      </div>
+      <div style="position:relative;height:300px">
+        <canvas id="vendorCanvas"></canvas>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">Vendor Summary</div>
+      <div class="tbl-wrap"><table id="vendorTable"></table></div>
+    </div>
+  </div>
+
   <!-- ══ FIELD UPDATES ══ -->
   <div id="tab-field" class="tab-panel">
     <div class="filter-row">
@@ -328,7 +357,7 @@ td.notes-cell{white-space:normal;max-width:260px;color:var(--bright);text-align:
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbwp4KdsvPWv2pON1iIOTjaJhYeLJpLZWBfShz2nBZRPCsCIeVH40o-GAURk9gPg7d-BZw/exec';
 
 // ── STATE ─────────────────────────────────────────────────────
-let _exec = null, _gantt = null, _scurve = null, _field = null, _critical = null;
+let _exec = null, _gantt = null, _scurve = null, _field = null, _critical = null, _vendor = null;
 let _scurveChart = null;
 
 // ── TABS ──────────────────────────────────────────────────────
@@ -359,16 +388,19 @@ async function loadAll() {
   document.getElementById('overlay').style.display = 'flex';
   document.getElementById('errBanner').style.display = 'none';
   try {
-    const [meta, exec, gantt, scurve, field, critical] = await Promise.all([
-      gas('meta'), gas('exec'), gas('gantt'), gas('scurve'), gas('fieldupdates'), gas('criticalworks')
+    const [meta, exec, gantt, scurve, field, critical, vendor] = await Promise.all([
+      gas('meta'), gas('exec'), gas('gantt'), gas('scurve'),
+      gas('fieldupdates'), gas('criticalworks'), gas('vendorupdates')
     ]);
-    _exec = exec; _gantt = gantt; _scurve = scurve; _field = field; _critical = critical;
+    _exec = exec; _gantt = gantt; _scurve = scurve;
+    _field = field; _critical = critical; _vendor = vendor;
     applyMeta(meta);
     renderExec();
     renderGantt();
     initScurve();
-    initField();
     initCritical();
+    initVendor();
+    initField();
   } catch(e) {
     showErr('Error loading data: ' + e.message);
   } finally {
@@ -661,6 +693,117 @@ function renderScurve() {
       },
     },
   });
+}
+
+// ── VENDOR UPDATES ────────────────────────────────────────────
+let _vendorChart = null;
+
+function initVendor() {
+  const d = _vendor;
+  if (!d || !d.vendors) return;
+  renderVendorChart();
+  renderVendorTable();
+}
+
+function renderVendorChart() {
+  const d = _vendor;
+  if (!d || !d.vendors || d.vendors.length === 0) return;
+
+  const labels    = d.vendors.map(v => v.team);
+  const pctUpd    = d.vendors.map(v => v.pctUpdated);
+  const targetPct = d.vendors.map(() => 100);
+  const compRatio = d.vendors.map(v => v.completionRatio);
+
+  const ctx = document.getElementById('vendorCanvas').getContext('2d');
+  if (_vendorChart) _vendorChart.destroy();
+
+  _vendorChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: '% Updated',
+          data: pctUpd,
+          backgroundColor: '#4a9e5c',
+          borderRadius: 2,
+        },
+        {
+          label: 'Target %',
+          data: targetPct,
+          backgroundColor: 'rgba(180,180,180,.5)',
+          borderRadius: 2,
+        },
+        {
+          label: 'Completion Ratio',
+          data: compRatio,
+          backgroundColor: '#5b9bd5',
+          borderRadius: 2,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#1c2330', borderColor: '#2a3444', borderWidth: 1,
+          titleColor: '#b8c9e0', bodyColor: '#b8c9e0',
+          callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.raw}%` },
+        },
+      },
+      scales: {
+        x: {
+          ticks: { color: '#4d6080', font: { size: 10 }, maxRotation: 45 },
+          grid:  { color: 'rgba(42,52,68,.4)' },
+        },
+        y: {
+          min: 0, max: 100,
+          ticks: { color: '#4d6080', font: { size: 11 }, callback: v => v + '%' },
+          grid:  { color: 'rgba(42,52,68,.4)' },
+        },
+      },
+    },
+  });
+}
+
+function renderVendorTable() {
+  const d = _vendor;
+  if (!d || !d.vendors) return;
+
+  const cols = [
+    { label: 'Vendor',           align: 'left'   },
+    { label: 'Updated',          align: 'center' },
+    { label: 'Total',            align: 'center' },
+    { label: 'Target Updates',   align: 'center' },
+    { label: '% Updated',        align: 'center' },
+    { label: 'Target %',         align: 'center' },
+    { label: 'Completed Tasks',  align: 'center' },
+    { label: 'Completion Ratio', align: 'center' },
+  ];
+
+  const pctTag = (p, target=100) => {
+    const cls = p >= target ? 'tag-green' : p >= target * 0.5 ? 'tag-amber' : 'tag-red';
+    return `<span class="tag ${cls}">${p}%</span>`;
+  };
+
+  const tHead = cols.map(c => `<th style="text-align:${c.align}">${c.label}</th>`).join('');
+  const tBody = d.vendors.map(v => `<tr>
+    <td style="text-align:left;font-weight:500;color:var(--bright)">${v.team}</td>
+    <td style="text-align:center;font-family:var(--font-d)">${v.updated}</td>
+    <td style="text-align:center;font-family:var(--font-d)">${v.total}</td>
+    <td style="text-align:center;font-family:var(--font-d)">${v.targetUpdates}</td>
+    <td style="text-align:center">${pctTag(v.pctUpdated)}</td>
+    <td style="text-align:center;font-family:var(--font-d);color:var(--muted)">100%</td>
+    <td style="text-align:center;font-family:var(--font-d)">${v.completedTasks}</td>
+    <td style="text-align:center">${pctTag(v.completionRatio)}</td>
+  </tr>`).join('');
+
+  document.getElementById('vendorTable').innerHTML =
+    `<thead><tr>${tHead}</tr></thead>` +
+    `<tbody>${tBody || `<tr><td colspan="${cols.length}" style="text-align:center;color:var(--muted);padding:20px">No data</td></tr>`}</tbody>`;
 }
 
 // ── CRITICAL WORKS ────────────────────────────────────────────
