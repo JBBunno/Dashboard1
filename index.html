@@ -610,8 +610,13 @@ function renderScurve() {
   if (noActualYet) {
     forecast = baseline.slice();
   } else {
-    let cutoff = actual.length - 1;
-    while (cutoff > 0 && actual[cutoff] === 0) cutoff--;
+    // actual/baseline are cumulative, so once real progress stops being
+    // logged the value plateaus rather than returning to 0 — find the
+    // cutoff by the last period where it actually increased.
+    let cutoff = 0;
+    for (let i = 1; i < actual.length; i++) {
+      if (actual[i] > actual[i - 1] + 0.001) cutoff = i;
+    }
 
     forecast = actual.map((v, i) => i <= cutoff ? v : null);
     const baselineAtCutoff = baseline[cutoff] || 0;
