@@ -362,6 +362,7 @@ const GAS_URL = 'https://script.google.com/macros/s/AKfycbwp4KdsvPWv2pON1iIOTjaJ
 // ── STATE ─────────────────────────────────────────────────────
 let _exec = null, _gantt = null, _scurve = null, _field = null, _critical = null, _vendor = null;
 let _outDates = null;
+let _outDatesErr = null;
 let _fieldRowsFiltered = [];
 let _outstandingRowsFiltered = [];
 let _scurveChart = null;
@@ -390,12 +391,23 @@ async function loadAll() {
   document.getElementById('overlay').style.display = 'flex';
   document.getElementById('errBanner').style.display = 'none';
   try {
-    const [meta, exec, gantt, scurve, field, critical, vendor, outDates] = await Promise.all([
+    // outstandingdates is fetched separately and never allowed to throw —
+    // if it fails (e.g. new action not deployed yet, or a bad join), the
+    // rest of the dashboard must still load normally. Outstanding just
+    // falls back to showing no due-status badges.
+    const [meta, exec, gantt, scurve, field, critical, vendor] = await Promise.all([
       gas('meta'), gas('exec'), gas('gantt'), gas('scurve'),
-      gas('fieldupdates'), gas('criticalworks'), gas('vendorupdates'), gas('outstandingdates')
+      gas('fieldupdates'), gas('criticalworks'), gas('vendorupdates')
     ]);
+    let outDates = null, outDatesErr = null;
+    try {
+      outDates = await gas('outstandingdates');
+    } catch(e2) {
+      outDatesErr = e2.message;
+    }
     _exec = exec; _gantt = gantt; _scurve = scurve;
-    _field = field; _critical = critical; _vendor = vendor; _outDates = outDates;
+    _field = field; _critical = critical; _vendor = vendor;
+    _outDates = outDates; _outDatesErr = outDatesErr;
     applyMeta(meta);
     renderExec();
     renderGantt();
@@ -986,6 +998,18 @@ function renderOutstanding() {
 
   document.getElementById('outstandingCount').textContent =
     rows.length + ' of ' + d.rows.length + ' total task rows have not been updated (App % = 0 or blank)';
+
+  if (_outDatesErr) {
+    document.getElementById('outstandingSummary').innerHTML =
+      `<div style="color:var(--muted);font-size:12px;padding:6px 0">
+        Overdue / Not Due split unavailable right now (${_outDatesErr}). Everything else on this dashboard is unaffected.
+      </div>`;
+    document.getElementById('outstandingTable').innerHTML =
+      `<thead><tr>${headers.map(h => `<th style="text-align:left">${h}</th>`).join('')}</tr></thead>` +
+      `<tbody>${rows.slice(0,500).map(r => '<tr>' + r.map(val => `<td style="text-align:left">${val || '—'}</td>`).join('') + '</tr>').join('') ||
+        `<tr><td colspan="${headers.length}" style="text-align:center;color:var(--muted);padding:20px">All tasks have been updated</td></tr>`}</tbody>`;
+    return;
+  }
 
   document.getElementById('outstandingSummary').innerHTML = `
     <div class="out-summary-cell">
